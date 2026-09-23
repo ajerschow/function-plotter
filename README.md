@@ -24,18 +24,24 @@ HTML file that runs offline in any modern browser.
 Maxwell–Boltzmann speed distribution · particle in a box (ψₙ and |ψₙ|²) · Morse vs
 harmonic potential · Lennard-Jones potential · van der Waals isotherms (CO₂) ·
 Arrhenius rate constant (log y) · Planck black-body spectrum · hydrogen radial
-distribution functions · Boltzmann populations of a two-level system.
+distribution functions · Boltzmann populations of a two-level system · reduced van der
+Waals isotherms Pᵣ(Vᵣ) · reduced van der Waals compressibility factor Z(Pᵣ).
 
 ## Expression syntax
 
 | | |
 |---|---|
 | Operators | `+` `-` `*` `/` `^` (or `**`), parentheses, implicit multiplication |
-| Functions | `sin` `cos` `tan` `asin` `acos` `atan` `sinh` `cosh` `tanh` `exp` `ln` `log` `log10` `log2` `sqrt` `abs` `erf` `floor` `ceil` `min` `max` `pow` |
+| Functions | `sin` `cos` `tan` `asin` `acos` `atan` `sinh` `cosh` `tanh` `exp` `ln` `log` `log10` `log2` `sqrt` `abs` `erf` `floor` `ceil` `min` `max` `pow` `vdwZ` |
 | Constants | `pi` `e` `R` `kB` `h` `hbar` `c` `NA` `F` `qe` `me` `amu` `eps0` `a0` |
 
 Constants are SI values from CODATA. `erf` uses the Abramowitz & Stegun 7.1.26
 approximation (absolute error < 1.5×10⁻⁷).
+
+`vdwZ(P_R, T_R)` returns the compressibility factor Z = 3PᵣVᵣ/(8Tᵣ) predicted by the
+reduced van der Waals equation. Since that equation gives Pᵣ as a function of Vᵣ, the
+cubic 3PᵣVᵣ³ − (Pᵣ + 8Tᵣ)Vᵣ² + 9Vᵣ − 3 = 0 is solved numerically for the gas branch
+(largest real root). It returns exactly 1 at Pᵣ = 0 and 3/8 at the critical point.
 
 Example — a Gaussian with adjustable width, where `sigma` becomes a slider:
 
