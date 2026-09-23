@@ -69,8 +69,13 @@ section h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--i
 .fn input[type=text] { font-family: var(--mono); font-size: 13.5px; }
 .fn input.bad { border-color: var(--danger); }
 .fn .err { grid-column: 2 / -1; color: var(--danger); font-size: 12.5px; margin: -4px 0 4px; }
-.fn .xrow { grid-column: 2 / -1; display: grid; grid-template-columns: auto 1fr; gap: 6px; align-items: center; margin: -2px 0 2px; }
-.fn .xrow span { color: var(--ink-3); font-family: var(--mono); font-size: 12.5px; }
+.fn .xrow { grid-column: 2 / -1; display: grid; grid-template-columns: auto auto 1fr; gap: 6px; align-items: center; margin: -2px 0 2px; }
+.fn .xrow span { color: var(--ink-3); font-size: 12.5px; }
+.fn .xrow select { width: auto; font-family: var(--mono); font-size: 12.5px; padding: 3px 6px; }
+.def { display: grid; grid-template-columns: 5.5em auto 1fr auto; gap: 6px; align-items: center; margin-bottom: 6px; }
+.def input { font-family: var(--mono); font-size: 12.5px; padding: 4px 6px; }
+.def .eq { color: var(--ink-3); }
+.def .err { grid-column: 1 / -1; color: var(--danger); font-size: 12.5px; margin: -2px 0 2px; }
 details.ref .adv { margin-top: 8px; }
 details.ref .adv .row { margin-bottom: 8px; }
 .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
@@ -160,21 +165,23 @@ details.ref td { padding: 2px 10px 2px 0; vertical-align: top; }
         <input type="text" id="ylabel" placeholder="y-axis label (optional)">
       </div>
       <details class="ref" id="advWrap">
-        <summary>Advanced: plot against a computed quantity</summary>
+        <summary>Advanced: define quantities and choose the x-axis</summary>
         <div class="adv">
-          <p class="hint" style="margin-bottom:8px">Normally the x-axis <em>is</em> the variable. Switch this on to
-            sweep the variable behind the scenes and plot each curve against a quantity computed from it &mdash; useful
-            when the x quantity is only known as a function of the variable, such as Z against reduced pressure.</p>
-          <label class="check"><input type="checkbox" id="parametric"> x-axis from an expression</label>
+          <p class="hint" style="margin-bottom:8px">Give a name to an expression in the variable, then use that name in
+            any curve &mdash; and pick it as that curve&rsquo;s x-axis. Useful when the quantity you want across the
+            bottom is only known as a function of the variable, such as Z against reduced pressure. With no definitions
+            nothing changes, and the x-axis stays the variable.</p>
+          <div id="defs"></div>
+          <button class="ghost" id="addDef" style="margin-top:2px">+ Add definition</button>
           <div id="advOpts" hidden>
-            <div class="row" style="margin-top:8px">
+            <div class="row" style="margin-top:10px">
               <label>x-axis</label>
               <label>from</label><input type="text" id="xaxmin" placeholder="auto">
               <label>to</label><input type="text" id="xaxmax" placeholder="auto">
             </div>
             <label class="check"><input type="checkbox" id="logsweep"> sample the variable logarithmically</label>
-            <p class="hint" style="margin-top:6px">Each curve gets its own <code>x:</code> field above. The
-              &ldquo;Variable from/to&rdquo; range above is now the <em>sweep</em> range, not the x-axis.</p>
+            <p class="hint" style="margin-top:6px">While a curve plots against a defined quantity, the
+              &ldquo;Variable from/to&rdquo; range above is the <em>sweep</em> range, not the x-axis.</p>
           </div>
         </div>
       </details>
@@ -356,18 +363,24 @@ const PRESETS = [
           '(8/3)*1.1/(VR-1/3) - 3/VR^2',
           '(8/3)*1.2/(VR-1/3) - 3/VR^2'],
     params: {} },
-  // Parametric: sweep V_R and map it to both P_R (x) and Z (y), so no cubic
-  // has to be inverted. Z = 3P_RV_R/(8T_R) reduces to 3V_R/(3V_R-1) - 9/(8T_RV_R).
+  // Sweep V_R and name the reduced pressure of each isotherm, then plot Z against it.
+  // Nothing has to be inverted: Z = 3 P_R V_R / (8 T_R) reads straight off the definition.
   { name: 'reduced van der Waals Z vs. P_R (Fig. 16.10)', v: 'VR', xmin: '0.34', xmax: '300',
-    parametric: true, logsweep: true, npts: 2000,
+    logsweep: true, npts: 2000,
     xaxmin: '0', xaxmax: '8', ymin: '0', ymax: '1.05',
     xlabel: 'P_R', ylabel: 'Z = PV/RT',
+    defs: [
+      { name: 'PR_10', src: '8*1.0/(3*VR-1) - 3/VR^2' },
+      { name: 'PR_11', src: '8*1.1/(3*VR-1) - 3/VR^2' },
+      { name: 'PR_12', src: '8*1.2/(3*VR-1) - 3/VR^2' },
+      { name: 'PR_15', src: '8*1.5/(3*VR-1) - 3/VR^2' },
+      { name: 'PR_20', src: '8*2.0/(3*VR-1) - 3/VR^2' }],
     fns: [
-      { x: '8*1.0/(3*VR-1) - 3/VR^2', y: '3*VR/(3*VR-1) - 9/(8*1.0*VR)', label: 'T_R = 1.0' },
-      { x: '8*1.1/(3*VR-1) - 3/VR^2', y: '3*VR/(3*VR-1) - 9/(8*1.1*VR)', label: 'T_R = 1.1' },
-      { x: '8*1.2/(3*VR-1) - 3/VR^2', y: '3*VR/(3*VR-1) - 9/(8*1.2*VR)', label: 'T_R = 1.2' },
-      { x: '8*1.5/(3*VR-1) - 3/VR^2', y: '3*VR/(3*VR-1) - 9/(8*1.5*VR)', label: 'T_R = 1.5' },
-      { x: '8*2.0/(3*VR-1) - 3/VR^2', y: '3*VR/(3*VR-1) - 9/(8*2.0*VR)', label: 'T_R = 2.0' }],
+      { x: 'PR_10', y: '3*PR_10*VR/(8*1.0)', label: 'T_R = 1.0' },
+      { x: 'PR_11', y: '3*PR_11*VR/(8*1.1)', label: 'T_R = 1.1' },
+      { x: 'PR_12', y: '3*PR_12*VR/(8*1.2)', label: 'T_R = 1.2' },
+      { x: 'PR_15', y: '3*PR_15*VR/(8*1.5)', label: 'T_R = 1.5' },
+      { x: 'PR_20', y: '3*PR_20*VR/(8*2.0)', label: 'T_R = 2.0' }],
     params: {} },
   { name: 'Arrhenius rate constant (log y)', v: 'T', xmin: '250', xmax: '600', logy: true, xlabel: 'T / K', ylabel: 'k / s⁻¹',
     fns: ['A*exp(-Ea/(R*T))', 'A*exp(-Ea2/(R*T))'],
@@ -386,7 +399,9 @@ const PRESETS = [
 /* ---------------- State ---------------- */
 const COLORS = ['--c1', '--c2', '--c3', '--c4', '--c5', '--c6'];
 let state = null;
-let compiled = [];   // per function: {fn, ids, err}
+let compiled = [];   // per curve: {fn, ids, xvar}
+let compiledDefs = [];   // per definition: {name, fn}
+let defNames = new Set();
 let lastSeries = []; // for CSV & hover
 
 const $ = (id) => document.getElementById(id);
@@ -395,8 +410,8 @@ const els = {
   xmin: $('xmin'), xmax: $('xmax'), ymin: $('ymin'), ymax: $('ymax'), logx: $('logx'), logy: $('logy'),
   grid: $('grid'), npts: $('npts'), xlabel: $('xlabel'), ylabel: $('ylabel'), canvas: $('plot'),
   readout: $('readout'), warn: $('warn'), msg: $('msg'),
-  parametric: $('parametric'), logsweep: $('logsweep'), xaxmin: $('xaxmin'), xaxmax: $('xaxmax'),
-  advWrap: $('advWrap'), advOpts: $('advOpts')
+  logsweep: $('logsweep'), xaxmin: $('xaxmin'), xaxmax: $('xaxmax'),
+  advWrap: $('advWrap'), advOpts: $('advOpts'), defs: $('defs')
 };
 
 function freshState(preset) {
@@ -405,16 +420,26 @@ function freshState(preset) {
     ymin: preset.ymin || '', ymax: preset.ymax || '', logx: !!preset.logx, logy: !!preset.logy, grid: true,
     npts: preset.npts || 800,
     xlabel: preset.xlabel || '', ylabel: preset.ylabel || '',
-    parametric: !!preset.parametric, logsweep: !!preset.logsweep,
+    logsweep: !!preset.logsweep,
     xaxmin: preset.xaxmin || '', xaxmax: preset.xaxmax || '',
-    fns: preset.fns.map(f => (typeof f === 'string' ? { src: f, xsrc: '', label: '', on: true }
-                                                    : { src: f.y, xsrc: f.x || '', label: f.label || '', on: true })),
+    defs: (preset.defs || []).map(d => ({ name: d.name, src: d.src })),
+    fns: preset.fns.map(f => (typeof f === 'string' ? { src: f, xvar: '', label: '', on: true }
+                                                    : { src: f.y, xvar: f.x || '', label: f.label || '', on: true })),
     params: Object.fromEntries(Object.entries(preset.params).map(([k, [val, min, max, step]]) => [k, { val, min, max, step }]))
   };
 }
 
-function saveState() { try { localStorage.setItem('pchem-plotter-state', JSON.stringify(state)); } catch (_) {} }
-function loadState() { try { const s = localStorage.getItem('pchem-plotter-state'); return s ? JSON.parse(s) : null; } catch (_) { return null; } }
+const STORE_KEY = 'pchem-plotter-state-v2';   // v1 stored per-curve x expressions, not named definitions
+function saveState() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (_) {} }
+function loadState() {
+  try {
+    const s = localStorage.getItem(STORE_KEY); if (!s) return null;
+    const st = JSON.parse(s);
+    if (!st.defs) st.defs = [];
+    st.fns.forEach(f => { if (f.xvar === undefined) f.xvar = ''; });
+    return st;
+  } catch (_) { return null; }
+}
 
 /* ---------------- UI: functions ---------------- */
 function renderFns() {
@@ -430,25 +455,53 @@ function renderFns() {
     const rm = document.createElement('button'); rm.className = 'ghost'; rm.textContent = '×'; rm.title = 'Remove';
     rm.onclick = () => { state.fns.splice(i, 1); renderFns(); update(); };
     row.append(sw, inp, rm);
-    if (state.parametric) {
-      inp.setAttribute('aria-label', `Curve ${i + 1} y expression`);
+    if (state.defs.length) {
       const xr = document.createElement('div'); xr.className = 'xrow';
-      const tag = document.createElement('span'); tag.textContent = 'x:';
-      const xin = document.createElement('input'); xin.type = 'text'; xin.value = f.xsrc || ''; xin.spellcheck = false;
-      xin.placeholder = state.v; xin.setAttribute('aria-label', `Curve ${i + 1} x expression`);
-      xin.oninput = () => { f.xsrc = xin.value; f.label = ''; update(); };
-      xr.append(tag, xin); row.appendChild(xr);
+      const tag = document.createElement('span'); tag.textContent = 'plot against';
+      const sel = document.createElement('select'); sel.setAttribute('aria-label', `Curve ${i + 1} x-axis`);
+      const opts = [['', state.v], ...state.defs.filter(d => d.name).map(d => [d.name, d.name])];
+      opts.forEach(([v, text]) => { const o = document.createElement('option'); o.value = v; o.textContent = text; sel.appendChild(o); });
+      sel.value = opts.some(([v]) => v === f.xvar) ? f.xvar : '';
+      f.xvar = sel.value;
+      sel.onchange = () => { f.xvar = sel.value; update(); };
+      xr.append(tag, sel, document.createElement('span')); row.appendChild(xr);
     }
     const err = document.createElement('div'); err.className = 'err'; row.appendChild(err);
     els.fns.appendChild(row);
   });
 }
 
+/* ---------------- UI: definitions ---------------- */
+function renderDefs() {
+  els.defs.innerHTML = '';
+  state.defs.forEach((d, i) => {
+    const row = document.createElement('div'); row.className = 'def';
+    const nm = document.createElement('input'); nm.type = 'text'; nm.value = d.name; nm.spellcheck = false;
+    nm.setAttribute('aria-label', `Definition ${i + 1} name`);
+    nm.oninput = () => { d.name = nm.value.trim(); renderFns(); update(); };
+    const eq = document.createElement('span'); eq.className = 'eq'; eq.textContent = '=';
+    const ex = document.createElement('input'); ex.type = 'text'; ex.value = d.src; ex.spellcheck = false;
+    ex.placeholder = `expression in ${state.v}`; ex.setAttribute('aria-label', `Definition ${i + 1} expression`);
+    ex.oninput = () => { d.src = ex.value; update(); };
+    const rm = document.createElement('button'); rm.className = 'ghost'; rm.textContent = '\u00d7'; rm.title = 'Remove';
+    rm.onclick = () => {
+      const gone = state.defs[i].name;
+      state.defs.splice(i, 1);
+      state.fns.forEach(f => { if (f.xvar === gone) f.xvar = ''; });   // curves fall back to the variable
+      renderDefs(); renderFns(); update();
+    };
+    row.append(nm, eq, ex, rm);
+    const err = document.createElement('div'); err.className = 'err'; row.appendChild(err);
+    els.defs.appendChild(row);
+  });
+}
+
 /* ---------------- UI: parameters ---------------- */
 function paramsInUse() {
   const set = new Set();
-  const take = (ids) => ids && ids.forEach(id => { if (id !== state.v) set.add(id); });
-  compiled.forEach(c => { if (c) { take(c.ids); take(c.xids); } });
+  const take = (ids) => ids && ids.forEach(id => { if (id !== state.v && !defNames.has(id)) set.add(id); });
+  compiled.forEach(c => { if (c) take(c.ids); });
+  compiledDefs.forEach(d => take(d.ids));
   return [...set].sort();
 }
 function fmt(x) {
@@ -484,32 +537,51 @@ function renderParams() {
 
 /* ---------------- Compile & plot ---------------- */
 function recompile() {
+  // Definitions first: they resolve in listed order, so a definition may build on
+  // earlier ones but not on later ones (which would otherwise read as undefined).
+  const names = state.defs.map(d => d.name);
+  compiledDefs = state.defs.map((d, i) => {
+    const row = els.defs.children[i];
+    const errEl = row && row.querySelector('.err');
+    const [nmEl, exEl] = row ? row.querySelectorAll('input') : [];
+    let msg = '';
+    let fn = null, ids = null;
+    if (!d.name) msg = 'needs a name';
+    else if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(d.name)) msg = `"${d.name}" is not a valid name`;
+    else if (d.name in CONSTS || FUNCS[d.name]) msg = `"${d.name}" is already a built-in`;
+    else if (d.name === state.v) msg = `"${d.name}" is the variable`;
+    else if (names.indexOf(d.name) !== i) msg = `"${d.name}" is defined twice`;
+    if (!msg) {
+      try {
+        const c = compile(d.src);
+        const early = [...c.ids].find(id => names.indexOf(id) >= i);
+        if (early === d.name) msg = `"${d.name}" refers to itself`;
+        else if (early) msg = `"${early}" is defined below this one`;
+        else { fn = c.fn; ids = c.ids; }
+      } catch (e) { msg = e.message === 'empty' ? 'needs an expression' : e.message; }
+    }
+    if (errEl) errEl.textContent = msg;
+    if (nmEl) nmEl.classList.toggle('bad', !!msg);
+    if (exEl) exEl.classList.toggle('bad', !!msg);
+    return { name: d.name, fn, ids };
+  });
+  defNames = new Set(names.filter(Boolean));
+
   compiled = state.fns.map((f, i) => {
     const row = els.fns.children[i];
     const errEl = row && row.querySelector('.err');
     const inp = row && row.querySelector('input');
-    const xin = row && row.querySelector('.xrow input');
-    const msgs = [];
-    let c = null, xc = null;
+    let c = null, msg = '';
     try {
       c = f.src.trim() ? compile(f.src) : null;
       if (inp) inp.classList.remove('bad');
     } catch (e) {
-      if (e.message !== 'empty') msgs.push(`y: ${e.message}`);
+      if (e.message !== 'empty') msg = e.message;
       if (inp) inp.classList.add('bad');
     }
-    if (state.parametric && (f.xsrc || '').trim()) {
-      try {
-        xc = compile(f.xsrc);
-        if (xin) xin.classList.remove('bad');
-      } catch (e) {
-        if (e.message !== 'empty') msgs.push(`x: ${e.message}`);
-        if (xin) xin.classList.add('bad');
-        c = null;                       // no usable x, so draw nothing for this curve
-      }
-    }
-    if (errEl) errEl.textContent = msgs.join(' — ');
-    return c ? { fn: c.fn, ids: c.ids, xfn: xc ? xc.fn : null, xids: xc ? xc.ids : null } : null;
+    const xvar = f.xvar && defNames.has(f.xvar) ? f.xvar : '';
+    if (errEl) errEl.textContent = msg;
+    return c ? { fn: c.fn, ids: c.ids, xvar } : null;
   });
 }
 
@@ -534,33 +606,45 @@ function computeSeries() {
   let v0 = parseFloat(state.xmin), v1 = parseFloat(state.xmax);
   if (!isFinite(v0) || !isFinite(v1) || v0 === v1) return null;
   if (v0 > v1) [v0, v1] = [v1, v0];
-  const par = !!state.parametric;
-  // In plain mode the x-axis IS the variable, so a log axis also means log sampling.
-  // In parametric mode the two are independent: the axis is the computed quantity.
+  const par = compiled.some(c => c && c.xvar);
+  // Plain mode: the x-axis IS the variable, so a log axis also means log sampling.
+  // Against a defined quantity the two are independent, hence the separate control.
   const logSweep = (par ? state.logsweep : state.logx) && v0 > 0;
+
   const env = {}; for (const [k, p] of Object.entries(state.params)) env[k] = p.val;
-  const series = [], issues = [];
-  state.fns.forEach((f, i) => {
-    const c = compiled[i]; if (!c || !f.on) { series.push(null); return; }
-    const xfn = par ? c.xfn : null;
-    const pts = new Array(N); let nInf = 0, nNaN = 0, nNonPos = 0;
-    for (let j = 0; j < N; j++) {
-      const t = j / (N - 1);
-      const vv = logSweep ? Math.pow(10, Math.log10(v0) + t * (Math.log10(v1) - Math.log10(v0))) : v0 + t * (v1 - v0);
-      env[state.v] = vv;
-      let y; try { y = c.fn(env); } catch (_) { y = NaN; }
-      if (typeof y !== 'number' || Number.isNaN(y)) { y = NaN; nNaN++; }
-      else if (!isFinite(y)) nInf++;
-      else if (state.logy && y <= 0) nNonPos++;
-      let x = vv;
-      if (xfn) { try { x = xfn(env); } catch (_) { x = NaN; } if (typeof x !== 'number') x = NaN; }
-      pts[j] = [x, y, vv];
-    }
-    if (nInf || nNaN || nNonPos) issues.push({ i, nInf, nNaN, nNonPos, N });
-    series.push(pts);
+  const live = [];
+  const series = state.fns.map((f, i) => {
+    const c = compiled[i];
+    if (!c || !f.on) return null;
+    const pts = new Array(N);
+    live.push({ i, c, pts, nInf: 0, nNaN: 0, nNonPos: 0 });
+    return pts;
   });
 
-  // x-axis extent: the variable range in plain mode, the computed values in parametric mode
+  for (let j = 0; j < N; j++) {
+    const t = j / (N - 1);
+    const vv = logSweep ? Math.pow(10, Math.log10(v0) + t * (Math.log10(v1) - Math.log10(v0))) : v0 + t * (v1 - v0);
+    env[state.v] = vv;
+    // Definitions resolve in order, so each may use the ones above it.
+    for (const d of compiledDefs) {
+      let val = NaN;
+      if (d.fn) { try { val = d.fn(env); } catch (_) { val = NaN; } if (typeof val !== 'number') val = NaN; }
+      if (d.name) env[d.name] = val;
+    }
+    for (const L of live) {
+      let y; try { y = L.c.fn(env); } catch (_) { y = NaN; }
+      if (typeof y !== 'number' || Number.isNaN(y)) { y = NaN; L.nNaN++; }
+      else if (!isFinite(y)) L.nInf++;
+      else if (state.logy && y <= 0) L.nNonPos++;
+      let x = L.c.xvar ? env[L.c.xvar] : vv;
+      if (typeof x !== 'number') x = NaN;
+      L.pts[j] = [x, y, vv];
+    }
+  }
+  const issues = live.filter(L => L.nInf || L.nNaN || L.nNonPos)
+                     .map(({ i, nInf, nNaN, nNonPos }) => ({ i, nInf, nNaN, nNonPos, N }));
+
+  // x-axis extent: the variable range, or the spread of the chosen quantity
   let x0 = v0, x1 = v1;
   if (par) {
     let lo = parseFloat(state.xaxmin), hi = parseFloat(state.xaxmax);
@@ -701,9 +785,10 @@ els.canvas.addEventListener('pointermove', (ev) => {
   if (px < mp.m.l || px > mp.m.l + mp.pw || py < mp.m.t || py > mp.m.t + mp.ph) { els.readout.textContent = ''; return; }
   const t = (px - mp.m.l) / mp.pw;
   const X = mp.X0 + t * (mp.X1 - mp.X0); const x = mp.logx ? Math.pow(10, X) : X;
-  // In parametric mode the samples are not evenly spaced along x, so look up the
-  // nearest sample by x rather than by index.
-  const lines = [`${mp.par ? (state.xlabel || 'x') : state.v} = ${fmt(x)}`];
+  // Against a defined quantity the samples are not evenly spaced along x, so look up
+  // the nearest sample by x rather than by index.
+  const xname = mp.par ? (state.fns.find(f => f.xvar) || {}).xvar || state.xlabel || 'x' : state.v;
+  const lines = [`${xname} = ${fmt(x)}`];
   lastSeries.forEach((s, i) => {
     if (!s) return;
     let idx = -1, best = Infinity;
@@ -728,24 +813,24 @@ function readAxesFromUI() {
   state.xmin = els.xmin.value; state.xmax = els.xmax.value; state.ymin = els.ymin.value; state.ymax = els.ymax.value;
   state.logx = els.logx.checked; state.logy = els.logy.checked; state.grid = els.grid.checked;
   state.npts = els.npts.value; state.xlabel = els.xlabel.value; state.ylabel = els.ylabel.value;
-  state.parametric = els.parametric.checked; state.logsweep = els.logsweep.checked;
+  state.logsweep = els.logsweep.checked;
   state.xaxmin = els.xaxmin.value; state.xaxmax = els.xaxmax.value;
   syncAdv();
 }
 // Keep the advanced panel's own visibility in step with the toggle. The panel stays
 // collapsed unless the state actually uses it, so plain plots never see any of this.
 function syncAdv() {
-  els.advOpts.hidden = !state.parametric;
+  els.advOpts.hidden = !state.defs.length;
   els.varLabel.textContent = state.v;
   const hint = els.fns.parentElement.querySelector('.hint');
-  if (hint) hint.textContent = state.parametric
-    ? `Each curve is a pair of expressions in ${state.v}: x: across, y: up. Any other letter becomes a slider below.`
+  if (hint) hint.textContent = state.defs.length
+    ? `Defined quantities can be used here and picked as any curve's x-axis. Any other letter becomes a slider below.`
     : "Any letter that isn't the variable or a constant becomes a slider below.";
 }
 function writeAxesToUI() {
-  els.parametric.checked = !!state.parametric; els.logsweep.checked = !!state.logsweep;
+  els.logsweep.checked = !!state.logsweep;
   els.xaxmin.value = state.xaxmin || ''; els.xaxmax.value = state.xaxmax || '';
-  if (state.parametric) els.advWrap.open = true;   // so the preset explains itself
+  if (state.defs.length) els.advWrap.open = true;   // so a preset that uses them explains itself
   syncAdv();
   els.varName.value = state.v; els.varLabel.textContent = state.v;
   els.xmin.value = state.xmin; els.xmax.value = state.xmax; els.ymin.value = state.ymin; els.ymax.value = state.ymax;
@@ -755,13 +840,14 @@ function writeAxesToUI() {
 let raf = 0;
 function update(reparams = true) {
   if (reparams) { recompile(); renderParams(); }
+  syncAdv();   // adding or removing a definition changes what the panel should show
   cancelAnimationFrame(raf); raf = requestAnimationFrame(draw);
   saveState();
 }
 function applyPreset(preset) {
   state = freshState(preset);
   els.preset.value = preset.name;
-  writeAxesToUI(); renderFns(); update();
+  writeAxesToUI(); renderDefs(); renderFns(); update();
 }
 
 PRESETS.forEach(p => { const o = document.createElement('option'); o.value = p.name; o.textContent = p.name; els.preset.appendChild(o); });
@@ -770,7 +856,13 @@ els.preset.onchange = () => applyPreset(PRESETS.find(p => p.name === els.preset.
  'logsweep', 'xaxmin', 'xaxmax'].forEach(id => {
   els[id].addEventListener('input', () => { readAxesFromUI(); update(id === 'varName'); });
 });
-els.parametric.addEventListener('change', () => { readAxesFromUI(); renderFns(); update(); });
+$('addDef').onclick = () => {
+  let n = 1, name; const taken = new Set(state.defs.map(d => d.name));
+  do { name = 'q' + n++; } while (taken.has(name));
+  state.defs.push({ name, src: '' });
+  renderDefs(); renderFns(); update();
+  els.defs.lastChild.querySelectorAll('input')[1].focus();
+};
 $('addFn').onclick = () => { state.fns.push({ src: '', on: true }); renderFns(); els.fns.lastChild.querySelector('input').focus(); update(); };
 $('resetView').onclick = () => applyPreset(PRESETS.find(p => p.name === state.presetName) || PRESETS[0]);
 $('clearAll').onclick = () => { applyPreset({ ...PRESETS[0], fns: [''], name: 'Blank' }); };
@@ -782,7 +874,7 @@ $('copyCsv').onclick = async () => {
   const par = data.par;
   // Parametric curves each carry their own x column; plain curves share the variable.
   const header = par
-    ? [state.v, ...live.flatMap(i => [q(state.fns[i].xsrc || state.v), q(state.fns[i].src)])].join(',')
+    ? [state.v, ...live.flatMap(i => [q(state.fns[i].xvar || state.v), q(state.fns[i].src)])].join(',')
     : [state.v, ...live.map(i => q(state.fns[i].src))].join(',');
   const N = data.series[live[0]] ? data.series[live[0]].length : 0;
   const rows = [header];
@@ -809,7 +901,7 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => upda
 
 // boot
 const saved = loadState();
-if (saved && saved.fns && saved.params) { state = saved; els.preset.value = state.presetName || 'Blank'; writeAxesToUI(); renderFns(); update(); }
+if (saved && saved.fns && saved.params) { state = saved; els.preset.value = state.presetName || 'Blank'; writeAxesToUI(); renderDefs(); renderFns(); update(); }
 else applyPreset(PRESETS[1]);
 </script>
 </body>
