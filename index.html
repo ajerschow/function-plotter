@@ -69,6 +69,10 @@ section h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--i
 .fn input[type=text] { font-family: var(--mono); font-size: 13.5px; }
 .fn input.bad { border-color: var(--danger); }
 .fn .err { grid-column: 2 / -1; color: var(--danger); font-size: 12.5px; margin: -4px 0 4px; }
+.fn .xrow { grid-column: 2 / -1; display: grid; grid-template-columns: auto 1fr; gap: 6px; align-items: center; margin: -2px 0 2px; }
+.fn .xrow span { color: var(--ink-3); font-family: var(--mono); font-size: 12.5px; }
+details.ref .adv { margin-top: 8px; }
+details.ref .adv .row { margin-bottom: 8px; }
 .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .row label { color: var(--ink-2); font-size: 13.5px; white-space: nowrap; }
 .row input[type=text], .row input[type=number] { font-family: var(--mono); font-size: 13px; }
@@ -155,6 +159,25 @@ details.ref td { padding: 2px 10px 2px 0; vertical-align: top; }
         <input type="text" id="xlabel" placeholder="x-axis label (optional)">
         <input type="text" id="ylabel" placeholder="y-axis label (optional)">
       </div>
+      <details class="ref" id="advWrap">
+        <summary>Advanced: plot against a computed quantity</summary>
+        <div class="adv">
+          <p class="hint" style="margin-bottom:8px">Normally the x-axis <em>is</em> the variable. Switch this on to
+            sweep the variable behind the scenes and plot each curve against a quantity computed from it &mdash; useful
+            when the x quantity is only known as a function of the variable, such as Z against reduced pressure.</p>
+          <label class="check"><input type="checkbox" id="parametric"> x-axis from an expression</label>
+          <div id="advOpts" hidden>
+            <div class="row" style="margin-top:8px">
+              <label>x-axis</label>
+              <label>from</label><input type="text" id="xaxmin" placeholder="auto">
+              <label>to</label><input type="text" id="xaxmax" placeholder="auto">
+            </div>
+            <label class="check"><input type="checkbox" id="logsweep"> sample the variable logarithmically</label>
+            <p class="hint" style="margin-top:6px">Each curve gets its own <code>x:</code> field above. The
+              &ldquo;Variable from/to&rdquo; range above is now the <em>sweep</em> range, not the x-axis.</p>
+          </div>
+        </div>
+      </details>
     </section>
 
     <section>
@@ -211,35 +234,11 @@ function erf(x) { // Abramowitz & Stegun 7.1.26
   const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
   return s * y;
 }
-// Compressibility factor Z = 3 P_R V_R / (8 T_R) from the reduced van der Waals
-// equation P_R = 8T_R/(3V_R - 1) - 3/V_R^2, which is a cubic in V_R. Solved by
-// bisection on the gas branch (largest root) rather than in closed form, so it
-// stays well behaved at small P_R where Cardano's formula loses precision.
-function vdwZ(P, T) {
-  if (P === 0) return 1;                       // ideal-gas limit
-  if (!(P > 0) || !(T > 0)) return NaN;
-  const f = (V) => 8 * T / (3 * V - 1) - 3 / (V * V) - P;
-  let hi = 1e6;
-  if (f(hi) > 0) return NaN;                   // root beyond the search window
-  let lo = hi, found = false;
-  for (let k = 0; k < 500; k++) {              // walk down to bracket the largest root
-    lo /= 1.05;
-    if (lo <= 1 / 3) { lo = 1 / 3 + 1e-12; found = f(lo) > 0; break; }
-    if (f(lo) > 0) { found = true; break; }
-    hi = lo;
-  }
-  if (!found) return NaN;
-  for (let i = 0; i < 100; i++) {
-    const mid = 0.5 * (lo + hi);
-    if (f(mid) > 0) lo = mid; else hi = mid;
-  }
-  return 3 * P * (0.5 * (lo + hi)) / (8 * T);
-}
 const FUNCS = {
   sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: Math.asin, acos: Math.acos, atan: Math.atan,
   sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh, exp: Math.exp, ln: Math.log, log: Math.log,
   log10: Math.log10, log2: Math.log2, sqrt: Math.sqrt, abs: Math.abs, erf, floor: Math.floor, ceil: Math.ceil,
-  min: Math.min, max: Math.max, pow: Math.pow, vdwZ
+  min: Math.min, max: Math.max, pow: Math.pow
 };
 
 function tokenize(src) {
@@ -357,9 +356,18 @@ const PRESETS = [
           '(8/3)*1.1/(VR-1/3) - 3/VR^2',
           '(8/3)*1.2/(VR-1/3) - 3/VR^2'],
     params: {} },
-  { name: 'reduced van der Waals Z vs. P_R (Fig. 16.10)', v: 'PR', xmin: '0', xmax: '8', ymin: '0', ymax: '1.05',
+  // Parametric: sweep V_R and map it to both P_R (x) and Z (y), so no cubic
+  // has to be inverted. Z = 3P_RV_R/(8T_R) reduces to 3V_R/(3V_R-1) - 9/(8T_RV_R).
+  { name: 'reduced van der Waals Z vs. P_R (Fig. 16.10)', v: 'VR', xmin: '0.34', xmax: '300',
+    parametric: true, logsweep: true, npts: 2000,
+    xaxmin: '0', xaxmax: '8', ymin: '0', ymax: '1.05',
     xlabel: 'P_R', ylabel: 'Z = PV/RT',
-    fns: ['vdwZ(PR, 1.0)', 'vdwZ(PR, 1.1)', 'vdwZ(PR, 1.2)', 'vdwZ(PR, 1.5)', 'vdwZ(PR, 2.0)'],
+    fns: [
+      { x: '8*1.0/(3*VR-1) - 3/VR^2', y: '3*VR/(3*VR-1) - 9/(8*1.0*VR)', label: 'T_R = 1.0' },
+      { x: '8*1.1/(3*VR-1) - 3/VR^2', y: '3*VR/(3*VR-1) - 9/(8*1.1*VR)', label: 'T_R = 1.1' },
+      { x: '8*1.2/(3*VR-1) - 3/VR^2', y: '3*VR/(3*VR-1) - 9/(8*1.2*VR)', label: 'T_R = 1.2' },
+      { x: '8*1.5/(3*VR-1) - 3/VR^2', y: '3*VR/(3*VR-1) - 9/(8*1.5*VR)', label: 'T_R = 1.5' },
+      { x: '8*2.0/(3*VR-1) - 3/VR^2', y: '3*VR/(3*VR-1) - 9/(8*2.0*VR)', label: 'T_R = 2.0' }],
     params: {} },
   { name: 'Arrhenius rate constant (log y)', v: 'T', xmin: '250', xmax: '600', logy: true, xlabel: 'T / K', ylabel: 'k / s⁻¹',
     fns: ['A*exp(-Ea/(R*T))', 'A*exp(-Ea2/(R*T))'],
@@ -386,15 +394,21 @@ const els = {
   fns: $('fns'), params: $('params'), preset: $('preset'), varName: $('varName'), varLabel: $('varLabel'),
   xmin: $('xmin'), xmax: $('xmax'), ymin: $('ymin'), ymax: $('ymax'), logx: $('logx'), logy: $('logy'),
   grid: $('grid'), npts: $('npts'), xlabel: $('xlabel'), ylabel: $('ylabel'), canvas: $('plot'),
-  readout: $('readout'), warn: $('warn'), msg: $('msg')
+  readout: $('readout'), warn: $('warn'), msg: $('msg'),
+  parametric: $('parametric'), logsweep: $('logsweep'), xaxmin: $('xaxmin'), xaxmax: $('xaxmax'),
+  advWrap: $('advWrap'), advOpts: $('advOpts')
 };
 
 function freshState(preset) {
   return {
     presetName: preset.name, v: preset.v, xmin: preset.xmin, xmax: preset.xmax,
-    ymin: preset.ymin || '', ymax: preset.ymax || '', logx: !!preset.logx, logy: !!preset.logy, grid: true, npts: 800,
+    ymin: preset.ymin || '', ymax: preset.ymax || '', logx: !!preset.logx, logy: !!preset.logy, grid: true,
+    npts: preset.npts || 800,
     xlabel: preset.xlabel || '', ylabel: preset.ylabel || '',
-    fns: preset.fns.map(s => ({ src: s, on: true })),
+    parametric: !!preset.parametric, logsweep: !!preset.logsweep,
+    xaxmin: preset.xaxmin || '', xaxmax: preset.xaxmax || '',
+    fns: preset.fns.map(f => (typeof f === 'string' ? { src: f, xsrc: '', label: '', on: true }
+                                                    : { src: f.y, xsrc: f.x || '', label: f.label || '', on: true })),
     params: Object.fromEntries(Object.entries(preset.params).map(([k, [val, min, max, step]]) => [k, { val, min, max, step }]))
   };
 }
@@ -412,10 +426,19 @@ function renderFns() {
     sw.onclick = () => { f.on = !f.on; sw.classList.toggle('off', !f.on); update(); };
     const inp = document.createElement('input'); inp.type = 'text'; inp.value = f.src; inp.spellcheck = false;
     inp.placeholder = `f(${state.v})`; inp.setAttribute('aria-label', `Function ${i + 1}`);
-    inp.oninput = () => { f.src = inp.value; update(); };
+    inp.oninput = () => { f.src = inp.value; f.label = ''; update(); };
     const rm = document.createElement('button'); rm.className = 'ghost'; rm.textContent = '×'; rm.title = 'Remove';
     rm.onclick = () => { state.fns.splice(i, 1); renderFns(); update(); };
     row.append(sw, inp, rm);
+    if (state.parametric) {
+      inp.setAttribute('aria-label', `Curve ${i + 1} y expression`);
+      const xr = document.createElement('div'); xr.className = 'xrow';
+      const tag = document.createElement('span'); tag.textContent = 'x:';
+      const xin = document.createElement('input'); xin.type = 'text'; xin.value = f.xsrc || ''; xin.spellcheck = false;
+      xin.placeholder = state.v; xin.setAttribute('aria-label', `Curve ${i + 1} x expression`);
+      xin.oninput = () => { f.xsrc = xin.value; f.label = ''; update(); };
+      xr.append(tag, xin); row.appendChild(xr);
+    }
     const err = document.createElement('div'); err.className = 'err'; row.appendChild(err);
     els.fns.appendChild(row);
   });
@@ -424,7 +447,8 @@ function renderFns() {
 /* ---------------- UI: parameters ---------------- */
 function paramsInUse() {
   const set = new Set();
-  compiled.forEach(c => c && c.ids && c.ids.forEach(id => { if (id !== state.v) set.add(id); }));
+  const take = (ids) => ids && ids.forEach(id => { if (id !== state.v) set.add(id); });
+  compiled.forEach(c => { if (c) { take(c.ids); take(c.xids); } });
   return [...set].sort();
 }
 function fmt(x) {
@@ -461,17 +485,31 @@ function renderParams() {
 /* ---------------- Compile & plot ---------------- */
 function recompile() {
   compiled = state.fns.map((f, i) => {
-    const errEl = els.fns.children[i] && els.fns.children[i].querySelector('.err');
-    const inp = els.fns.children[i] && els.fns.children[i].querySelector('input');
+    const row = els.fns.children[i];
+    const errEl = row && row.querySelector('.err');
+    const inp = row && row.querySelector('input');
+    const xin = row && row.querySelector('.xrow input');
+    const msgs = [];
+    let c = null, xc = null;
     try {
-      const c = f.src.trim() ? compile(f.src) : null;
-      if (errEl) errEl.textContent = ''; if (inp) inp.classList.remove('bad');
-      return c;
+      c = f.src.trim() ? compile(f.src) : null;
+      if (inp) inp.classList.remove('bad');
     } catch (e) {
-      if (errEl) errEl.textContent = e.message === 'empty' ? '' : e.message;
+      if (e.message !== 'empty') msgs.push(`y: ${e.message}`);
       if (inp) inp.classList.add('bad');
-      return null;
     }
+    if (state.parametric && (f.xsrc || '').trim()) {
+      try {
+        xc = compile(f.xsrc);
+        if (xin) xin.classList.remove('bad');
+      } catch (e) {
+        if (e.message !== 'empty') msgs.push(`x: ${e.message}`);
+        if (xin) xin.classList.add('bad');
+        c = null;                       // no usable x, so draw nothing for this curve
+      }
+    }
+    if (errEl) errEl.textContent = msgs.join(' — ');
+    return c ? { fn: c.fn, ids: c.ids, xfn: xc ? xc.fn : null, xids: xc ? xc.ids : null } : null;
   });
 }
 
@@ -493,29 +531,56 @@ function logTicks(lo, hi) { // lo, hi in log10 space
 
 function computeSeries() {
   const N = Math.max(50, Math.min(5000, parseInt(state.npts) || 800));
-  let x0 = parseFloat(state.xmin), x1 = parseFloat(state.xmax);
-  if (!isFinite(x0) || !isFinite(x1) || x0 === x1) return null;
-  if (x0 > x1) [x0, x1] = [x1, x0];
-  const logx = state.logx && x0 > 0;
+  let v0 = parseFloat(state.xmin), v1 = parseFloat(state.xmax);
+  if (!isFinite(v0) || !isFinite(v1) || v0 === v1) return null;
+  if (v0 > v1) [v0, v1] = [v1, v0];
+  const par = !!state.parametric;
+  // In plain mode the x-axis IS the variable, so a log axis also means log sampling.
+  // In parametric mode the two are independent: the axis is the computed quantity.
+  const logSweep = (par ? state.logsweep : state.logx) && v0 > 0;
   const env = {}; for (const [k, p] of Object.entries(state.params)) env[k] = p.val;
   const series = [], issues = [];
   state.fns.forEach((f, i) => {
     const c = compiled[i]; if (!c || !f.on) { series.push(null); return; }
+    const xfn = par ? c.xfn : null;
     const pts = new Array(N); let nInf = 0, nNaN = 0, nNonPos = 0;
     for (let j = 0; j < N; j++) {
       const t = j / (N - 1);
-      const x = logx ? Math.pow(10, Math.log10(x0) + t * (Math.log10(x1) - Math.log10(x0))) : x0 + t * (x1 - x0);
-      env[state.v] = x;
+      const vv = logSweep ? Math.pow(10, Math.log10(v0) + t * (Math.log10(v1) - Math.log10(v0))) : v0 + t * (v1 - v0);
+      env[state.v] = vv;
       let y; try { y = c.fn(env); } catch (_) { y = NaN; }
       if (typeof y !== 'number' || Number.isNaN(y)) { y = NaN; nNaN++; }
       else if (!isFinite(y)) nInf++;
       else if (state.logy && y <= 0) nNonPos++;
-      pts[j] = [x, y];
+      let x = vv;
+      if (xfn) { try { x = xfn(env); } catch (_) { x = NaN; } if (typeof x !== 'number') x = NaN; }
+      pts[j] = [x, y, vv];
     }
     if (nInf || nNaN || nNonPos) issues.push({ i, nInf, nNaN, nNonPos, N });
     series.push(pts);
   });
-  return { series, issues, x0, x1, logx };
+
+  // x-axis extent: the variable range in plain mode, the computed values in parametric mode
+  let x0 = v0, x1 = v1;
+  if (par) {
+    let lo = parseFloat(state.xaxmin), hi = parseFloat(state.xaxmax);
+    const autoLo = !isFinite(lo), autoHi = !isFinite(hi);
+    if (autoLo || autoHi) {
+      let a = Infinity, b = -Infinity;
+      series.forEach(ss => ss && ss.forEach(([x, y]) => {
+        if (isFinite(x) && isFinite(y)) { if (x < a) a = x; if (x > b) b = x; }
+      }));
+      if (!isFinite(a)) { a = v0; b = v1; }
+      if (a === b) { a -= 1; b += 1; }
+      const pad = (b - a) * 0.04;
+      if (autoLo) lo = a - pad;
+      if (autoHi) hi = b + pad;
+    }
+    x0 = lo; x1 = hi;
+    if (x0 > x1) [x0, x1] = [x1, x0];
+    if (!(x1 > x0)) return null;
+  }
+  return { series, issues, x0, x1, logx: state.logx && x0 > 0, par };
 }
 
 function draw() {
@@ -534,7 +599,7 @@ function draw() {
   const pw = W - m.l - m.r, ph = H - m.t - m.b;
   if (!data || pw < 20 || ph < 20) { ctx.fillStyle = col('--ink-3'); ctx.font = `14px ${col('--sans')}`; ctx.fillText('Enter a valid x range.', m.l, m.t + 20); return; }
 
-  const { series, issues, x0, x1, logx } = data;
+  const { series, issues, x0, x1, logx, par } = data;
   const logy = state.logy;
   if (issues.length) {
     const parts = issues.map(({ i, nInf, nNaN, nNonPos, N }) => {
@@ -552,7 +617,10 @@ function draw() {
   const autoLo = !isFinite(ylo), autoHi = !isFinite(yhi);
   if (autoLo || autoHi) {
     let lo = Infinity, hi = -Infinity;
-    series.forEach(s => s && s.forEach(([, y]) => { if (isFinite(y) && (!logy || y > 0)) { if (y < lo) lo = y; if (y > hi) hi = y; } }));
+    series.forEach(s => s && s.forEach(([x, y]) => {
+      if (!isFinite(x) || x < x0 || x > x1) return;   // off-screen horizontally, so it must not drive the y range
+      if (isFinite(y) && (!logy || y > 0)) { if (y < lo) lo = y; if (y > hi) hi = y; }
+    }));
     if (!isFinite(lo)) { lo = logy ? 1 : -1; hi = logy ? 10 : 1; }
     if (lo === hi) { lo -= 1; hi += 1; }
     if (logy) { const pad = (Math.log10(hi) - Math.log10(lo)) * 0.05 || 0.5; if (autoLo) ylo = Math.pow(10, Math.log10(lo) - pad); if (autoHi) yhi = Math.pow(10, Math.log10(hi) + pad); }
@@ -601,7 +669,7 @@ function draw() {
     ctx.strokeStyle = col(COLORS[i % COLORS.length]); ctx.beginPath();
     let pen = false, prevPy = null;
     for (const [x, y] of s) {
-      const ok = isFinite(y) && (!useLogY || y > 0);
+      const ok = isFinite(y) && (!useLogY || y > 0) && isFinite(x) && (!logx || x > 0);
       if (!ok) { pen = false; prevPy = null; continue; }
       const px = sx(x), py = sy(y);
       const jump = prevPy !== null && Math.abs(py - prevPy) > ph * 3; // likely asymptote
@@ -617,12 +685,12 @@ function draw() {
   let ly = m.t + 12;
   state.fns.forEach((f, i) => {
     if (!series[i]) return;
-    const label = f.src.length > 42 ? f.src.slice(0, 40) + '…' : f.src;
+    const label = f.label || (f.src.length > 42 ? f.src.slice(0, 40) + '…' : f.src);
     ctx.fillStyle = col(COLORS[i % COLORS.length]); ctx.fillRect(m.l + 10, ly - 1.5, 18, 3);
     ctx.fillStyle = col('--ink'); ctx.fillText(label, m.l + 34, ly); ly += 18;
   });
 
-  draw.map = { sx, sy, m, pw, ph, x0, x1, X0, X1, logx, useLogY, ylo, yhi };
+  draw.map = { sx, sy, m, pw, ph, x0, x1, X0, X1, logx, useLogY, ylo, yhi, par };
 }
 
 /* ---------------- Hover readout ---------------- */
@@ -633,11 +701,20 @@ els.canvas.addEventListener('pointermove', (ev) => {
   if (px < mp.m.l || px > mp.m.l + mp.pw || py < mp.m.t || py > mp.m.t + mp.ph) { els.readout.textContent = ''; return; }
   const t = (px - mp.m.l) / mp.pw;
   const X = mp.X0 + t * (mp.X1 - mp.X0); const x = mp.logx ? Math.pow(10, X) : X;
-  const lines = [`${state.v} = ${fmt(x)}`];
+  // In parametric mode the samples are not evenly spaced along x, so look up the
+  // nearest sample by x rather than by index.
+  const lines = [`${mp.par ? (state.xlabel || 'x') : state.v} = ${fmt(x)}`];
   lastSeries.forEach((s, i) => {
     if (!s) return;
-    const idx = Math.round(t * (s.length - 1)); const y = s[idx][1];
-    lines.push(`f${i + 1} = ${isFinite(y) ? fmt(y) : '—'}`);
+    let idx = -1, best = Infinity;
+    for (let j = 0; j < s.length; j++) {
+      const d = Math.abs(s[j][0] - x);
+      if (isFinite(s[j][0]) && d < best) { best = d; idx = j; }
+    }
+    if (idx < 0) { lines.push(`f${i + 1} = —`); return; }
+    const y = s[idx][1];
+    const at = mp.par ? `  (${state.v} = ${fmt(s[idx][2])})` : '';
+    lines.push(`f${i + 1} = ${isFinite(y) ? fmt(y) : '—'}${at}`);
   });
   els.readout.textContent = lines.join('\n');
 });
@@ -651,8 +728,25 @@ function readAxesFromUI() {
   state.xmin = els.xmin.value; state.xmax = els.xmax.value; state.ymin = els.ymin.value; state.ymax = els.ymax.value;
   state.logx = els.logx.checked; state.logy = els.logy.checked; state.grid = els.grid.checked;
   state.npts = els.npts.value; state.xlabel = els.xlabel.value; state.ylabel = els.ylabel.value;
+  state.parametric = els.parametric.checked; state.logsweep = els.logsweep.checked;
+  state.xaxmin = els.xaxmin.value; state.xaxmax = els.xaxmax.value;
+  syncAdv();
+}
+// Keep the advanced panel's own visibility in step with the toggle. The panel stays
+// collapsed unless the state actually uses it, so plain plots never see any of this.
+function syncAdv() {
+  els.advOpts.hidden = !state.parametric;
+  els.varLabel.textContent = state.v;
+  const hint = els.fns.parentElement.querySelector('.hint');
+  if (hint) hint.textContent = state.parametric
+    ? `Each curve is a pair of expressions in ${state.v}: x: across, y: up. Any other letter becomes a slider below.`
+    : "Any letter that isn't the variable or a constant becomes a slider below.";
 }
 function writeAxesToUI() {
+  els.parametric.checked = !!state.parametric; els.logsweep.checked = !!state.logsweep;
+  els.xaxmin.value = state.xaxmin || ''; els.xaxmax.value = state.xaxmax || '';
+  if (state.parametric) els.advWrap.open = true;   // so the preset explains itself
+  syncAdv();
   els.varName.value = state.v; els.varLabel.textContent = state.v;
   els.xmin.value = state.xmin; els.xmax.value = state.xmax; els.ymin.value = state.ymin; els.ymax.value = state.ymax;
   els.logx.checked = state.logx; els.logy.checked = state.logy; els.grid.checked = state.grid;
@@ -672,19 +766,32 @@ function applyPreset(preset) {
 
 PRESETS.forEach(p => { const o = document.createElement('option'); o.value = p.name; o.textContent = p.name; els.preset.appendChild(o); });
 els.preset.onchange = () => applyPreset(PRESETS.find(p => p.name === els.preset.value));
-['varName', 'xmin', 'xmax', 'ymin', 'ymax', 'logx', 'logy', 'grid', 'npts', 'xlabel', 'ylabel'].forEach(id => {
+['varName', 'xmin', 'xmax', 'ymin', 'ymax', 'logx', 'logy', 'grid', 'npts', 'xlabel', 'ylabel',
+ 'logsweep', 'xaxmin', 'xaxmax'].forEach(id => {
   els[id].addEventListener('input', () => { readAxesFromUI(); update(id === 'varName'); });
 });
+els.parametric.addEventListener('change', () => { readAxesFromUI(); renderFns(); update(); });
 $('addFn').onclick = () => { state.fns.push({ src: '', on: true }); renderFns(); els.fns.lastChild.querySelector('input').focus(); update(); };
 $('resetView').onclick = () => applyPreset(PRESETS.find(p => p.name === state.presetName) || PRESETS[0]);
 $('clearAll').onclick = () => { applyPreset({ ...PRESETS[0], fns: [''], name: 'Blank' }); };
 $('copyCsv').onclick = async () => {
   const data = computeSeries(); if (!data) return;
   const live = state.fns.map((f, i) => data.series[i] ? i : -1).filter(i => i >= 0);
-  const header = [state.v, ...live.map(i => `"${state.fns[i].src.replace(/"/g, '""')}"`)].join(',');
+  if (!live.length) return;
+  const q = (t) => `"${t.replace(/"/g, '""')}"`;
+  const par = data.par;
+  // Parametric curves each carry their own x column; plain curves share the variable.
+  const header = par
+    ? [state.v, ...live.flatMap(i => [q(state.fns[i].xsrc || state.v), q(state.fns[i].src)])].join(',')
+    : [state.v, ...live.map(i => q(state.fns[i].src))].join(',');
   const N = data.series[live[0]] ? data.series[live[0]].length : 0;
   const rows = [header];
-  for (let j = 0; j < N; j++) rows.push([data.series[live[0]][j][0], ...live.map(i => data.series[i][j][1])].map(v => isFinite(v) ? v : '').join(','));
+  for (let j = 0; j < N; j++) {
+    const cells = par
+      ? [data.series[live[0]][j][2], ...live.flatMap(i => [data.series[i][j][0], data.series[i][j][1]])]
+      : [data.series[live[0]][j][0], ...live.map(i => data.series[i][j][1])];
+    rows.push(cells.map(v => isFinite(v) ? v : '').join(','));
+  }
   try { await navigator.clipboard.writeText(rows.join('\n')); els.msg.textContent = `Copied ${N} rows — paste into Excel or Sheets.`; }
   catch (_) { els.msg.textContent = 'Clipboard blocked by the browser; try again after clicking the page.'; }
   setTimeout(() => { els.msg.textContent = ''; }, 4000);
