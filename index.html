@@ -382,6 +382,14 @@ const PRESETS = [
       { x: 'PR_15', y: '3*PR_15*VR/(8*1.5)', label: 'T_R = 1.5' },
       { x: 'PR_20', y: '3*PR_20*VR/(8*2.0)', label: 'T_R = 2.0' }],
     params: {} },
+  // Ethane at 1 atm. C_P/R is the given cubic in T, so the enthalpy change integrates
+  // in closed form: ΔH = R ∫ C_P/R dT from 273.15 K, term by term.
+  { name: 'Enthalpy vs. temp (HW2-9)', v: 'T', xmin: '273.15', xmax: '1000',
+    xlabel: 'T / K', ylabel: 'ΔH̄ / J mol⁻¹',
+    fns: [
+      { y: 'R*(0.06436*(T-273.15) + 2.137e-2/2*(T^2-273.15^2) - 8.263e-6/3*(T^3-273.15^3) + 1.024e-9/4*(T^4-273.15^4))',
+        label: 'ΔH̄(T) = H̄(T) − H̄(273.15 K)' }],
+    params: {} },
   { name: 'Arrhenius rate constant (log y)', v: 'T', xmin: '250', xmax: '600', logy: true, xlabel: 'T / K', ylabel: 'k / s⁻¹',
     fns: ['A*exp(-Ea/(R*T))', 'A*exp(-Ea2/(R*T))'],
     params: { A: [1e13, 1e10, 1e15, 1e11], Ea: [50000, 5000, 200000, 1000], Ea2: [80000, 5000, 200000, 1000] } },
