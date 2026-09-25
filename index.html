@@ -390,6 +390,20 @@ const PRESETS = [
       { y: 'R*(0.06436*(T-273.15) + 2.137e-2/2*(T^2-273.15^2) - 8.263e-6/3*(T^3-273.15^3) + 1.024e-9/4*(T^4-273.15^4))',
         label: 'ΔH̄(T) = H̄(T) − H̄(273.15 K)' }],
     params: {} },
+  // One mole expanded from V1 to 2*V1, starting at 200 K and 1 bar. The reversible
+  // adiabats follow P*V^gamma = const, with gamma = 5/3 monatomic and 7/5 diatomic.
+  // V1 = R*T1/P1 in L/mol: R is in J mol⁻¹ K⁻¹ and P1 in bar, hence the factor 100.
+  { name: 'adiabatic expansion (HW2-10)', v: 'V', xmin: '16.628925236', xmax: '33.257850472',
+    ymin: '0', xlabel: 'V̄ / L mol⁻¹', ylabel: 'P / bar',
+    defs: [
+      { name: 'T1', src: '200' },
+      { name: 'P1', src: '1' },
+      { name: 'V1', src: 'R*T1/(100*P1)' }],
+    fns: [
+      { y: 'P1*V1/V',         label: 'isothermal, 200 K' },
+      { y: 'P1*(V1/V)^(5/3)', label: 'adiabatic, monatomic (γ = 5/3)' },
+      { y: 'P1*(V1/V)^(7/5)', label: 'adiabatic, diatomic (γ = 7/5)' }],
+    params: {} },
   { name: 'Arrhenius rate constant (log y)', v: 'T', xmin: '250', xmax: '600', logy: true, xlabel: 'T / K', ylabel: 'k / s⁻¹',
     fns: ['A*exp(-Ea/(R*T))', 'A*exp(-Ea2/(R*T))'],
     params: { A: [1e13, 1e10, 1e15, 1e11], Ea: [50000, 5000, 200000, 1000], Ea2: [80000, 5000, 200000, 1000] } },
