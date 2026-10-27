@@ -404,6 +404,27 @@ const PRESETS = [
       { y: 'P1*(V1/V)^(5/3)', label: 'adiabatic, monatomic (γ = 5/3)' },
       { y: 'P1*(V1/V)^(7/5)', label: 'adiabatic, diatomic (γ = 7/5)' }],
     params: {} },
+  // Water, assuming a constant ΔvapH = 40.65 kJ/mol and T_b = 373.15 K at 1 atm.
+  // Integrating dlnP/dT = ΔH/(RT²) gives ln(P/1 atm) = -(ΔH/R)(1/T - 1/T_b); solved for T
+  // it is explicit in P, so no inversion is needed. Everest is about 0.33 atm.
+  { name: 'boiling point vs. pressure (Clausius-Clapeyron)', v: 'P', xmin: '0.33', xmax: '1',
+    xlabel: 'P / atm', ylabel: 'T_b / K',
+    defs: [
+      { name: 'dH', src: '40650' },
+      { name: 'Tb1', src: '373.15' }],
+    fns: [
+      { y: '1/(1/Tb1 - R*ln(P)/dH)', label: 'water, ΔvapH = 40.65 kJ/mol' }],
+    params: {} },
+  // mu_JT = (2a/RT - b)/C_P, in SI (a in Pa m⁶ mol⁻², b in m³ mol⁻¹), times 1e5 for K/bar.
+  // vdW constants in L² bar mol⁻² and L mol⁻¹: Ar 1.355, 0.03201; H2 0.2476, 0.02661;
+  // N2 1.370, 0.0387. C_P = 5R/2 (monatomic Ar), 7R/2 (diatomic H2, N2; vibration frozen).
+  { name: 'Joule-Thomson coefficient (Ar, H2, N2)', v: 'T', xmin: '30', xmax: '600',
+    xlabel: 'T / K', ylabel: 'μ_JT / K bar⁻¹',
+    fns: [
+      { y: '1e5*(2*0.1355/(R*T) - 3.201e-5)/(5/2*R)', label: 'Ar (C_P = 5R/2)' },
+      { y: '1e5*(2*0.02476/(R*T) - 2.661e-5)/(7/2*R)', label: 'H₂ (C_P = 7R/2)' },
+      { y: '1e5*(2*0.1370/(R*T) - 3.87e-5)/(7/2*R)', label: 'N₂ (C_P = 7R/2)' }],
+    params: {} },
   { name: 'Arrhenius rate constant (log y)', v: 'T', xmin: '250', xmax: '600', logy: true, xlabel: 'T / K', ylabel: 'k / s⁻¹',
     fns: ['A*exp(-Ea/(R*T))', 'A*exp(-Ea2/(R*T))'],
     params: { A: [1e13, 1e10, 1e15, 1e11], Ea: [50000, 5000, 200000, 1000], Ea2: [80000, 5000, 200000, 1000] } },
