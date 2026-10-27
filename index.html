@@ -340,7 +340,7 @@ function compile(src) {
 
 /* ---------------- Presets ---------------- */
 const PRESETS = [
-  { name: 'Blank', v: 'x', xmin: '-10', xmax: '10', fns: ['sin(x)'], params: {} },
+  { name: 'Simple example', v: 'x', xmin: '-10', xmax: '10', fns: ['sin(x)'], params: {} },
   { name: 'Maxwell–Boltzmann speed distribution', v: 'v', xmin: '0', xmax: '2500', xlabel: 'speed v / m s⁻¹', ylabel: 'f(v) / s m⁻¹',
     fns: ['4*pi*(M/(2*pi*R*T))^(3/2) * v^2 * exp(-M*v^2/(2*R*T))', '4*pi*(M/(2*pi*R*T2))^(3/2) * v^2 * exp(-M*v^2/(2*R*T2))'],
     params: { M: [0.032, 0.002, 0.2, 0.002], T: [300, 50, 1500, 10], T2: [900, 50, 1500, 10] } },
@@ -353,7 +353,7 @@ const PRESETS = [
   { name: 'Lennard-Jones potential', v: 'r', xmin: '0.9', xmax: '3', ymin: '-1.5', ymax: '2', xlabel: 'r / σ', ylabel: 'V / ε',
     fns: ['4*eps*((sigma/r)^12 - (sigma/r)^6)', '4*eps*(sigma/r)^12', '-4*eps*(sigma/r)^6'],
     params: { eps: [1, 0.1, 3, 0.05], sigma: [1, 0.5, 2, 0.05] } },
-  { name: 'van der Waals isotherms (CO₂)', v: 'Vm', xmin: '6e-5', xmax: '8e-4', ymin: '0', ymax: '1.5e7', xlabel: 'Vₘ / m³ mol⁻¹', ylabel: 'P / Pa',
+  { name: 'van der Waals isotherms (CO₂)', course: true, v: 'Vm', xmin: '6e-5', xmax: '8e-4', ymin: '0', ymax: '1.5e7', xlabel: 'Vₘ / m³ mol⁻¹', ylabel: 'P / Pa',
     fns: ['R*T/(Vm-b) - a/Vm^2', 'R*T/Vm'],
     params: { T: [280, 200, 400, 1], a: [0.364, 0, 1, 0.005], b: [4.27e-5, 0, 1e-4, 1e-6] } },
   { name: 'reduced vdW P_R vs. V_R (HW1)', v: 'VR', xmin: '0.5', xmax: '10', xlabel: 'V_R', ylabel: 'P_R',
@@ -365,7 +365,7 @@ const PRESETS = [
     params: {} },
   // Sweep V_R and name the reduced pressure of each isotherm, then plot Z against it.
   // Nothing has to be inverted: Z = 3 P_R V_R / (8 T_R) reads straight off the definition.
-  { name: 'reduced van der Waals Z vs. P_R (Fig. 16.10)', v: 'VR', xmin: '0.34', xmax: '300',
+  { name: 'reduced van der Waals Z vs. P_R (Fig. 16.10)', course: true, v: 'VR', xmin: '0.34', xmax: '300',
     logsweep: true, npts: 2000,
     xaxmin: '0', xaxmax: '8', ymin: '0', ymax: '1.05',
     xlabel: 'P_R', ylabel: 'Z = PV/RT',
@@ -407,7 +407,7 @@ const PRESETS = [
   // Water, assuming a constant ΔvapH = 40.65 kJ/mol and T_b = 373.15 K at 1 atm.
   // Integrating dlnP/dT = ΔH/(RT²) gives ln(P/1 atm) = -(ΔH/R)(1/T - 1/T_b); solved for T
   // it is explicit in P, so no inversion is needed. Everest is about 0.33 atm.
-  { name: 'boiling point vs. pressure (Clausius-Clapeyron)', v: 'P', xmin: '0.33', xmax: '1',
+  { name: 'boiling point vs. pressure (HW5-5)', v: 'P', xmin: '0.33', xmax: '1',
     xlabel: 'P / atm', ylabel: 'T_b / K',
     defs: [
       { name: 'dH', src: '40650' },
@@ -418,7 +418,7 @@ const PRESETS = [
   // mu_JT = (2a/RT - b)/C_P, in SI (a in Pa m⁶ mol⁻², b in m³ mol⁻¹), times 1e5 for K/bar.
   // vdW constants in L² bar mol⁻² and L mol⁻¹: Ar 1.355, 0.03201; H2 0.2476, 0.02661;
   // N2 1.370, 0.0387. C_P = 5R/2 (monatomic Ar), 7R/2 (diatomic H2, N2; vibration frozen).
-  { name: 'Joule-Thomson coefficient (Ar, H2, N2)', v: 'T', xmin: '30', xmax: '600',
+  { name: 'Joule-Thomson coefficient (HW5-8)', v: 'T', xmin: '30', xmax: '600',
     xlabel: 'T / K', ylabel: 'μ_JT / K bar⁻¹',
     fns: [
       { y: '1e5*(2*0.1355/(R*T) - 3.201e-5)/(5/2*R)', label: 'Ar (C_P = 5R/2)' },
@@ -893,7 +893,15 @@ function applyPreset(preset) {
   writeAxesToUI(); renderDefs(); renderFns(); update();
 }
 
-PRESETS.forEach(p => { const o = document.createElement('option'); o.value = p.name; o.textContent = p.name; els.preset.appendChild(o); });
+// Course presets (named "... (HWn-m)", or flagged course: true) come first, then the rest.
+const isCourse = p => p.course || /\(HW\d/.test(p.name);
+function addGroup(label, list) {
+  const g = document.createElement('optgroup'); g.label = label;
+  list.forEach(p => { const o = document.createElement('option'); o.value = p.name; o.textContent = p.name; g.appendChild(o); });
+  els.preset.appendChild(g);
+}
+addGroup('Thermo course', PRESETS.filter(isCourse));
+addGroup('Additional examples', PRESETS.filter(p => !isCourse(p)));
 els.preset.onchange = () => applyPreset(PRESETS.find(p => p.name === els.preset.value));
 ['varName', 'xmin', 'xmax', 'ymin', 'ymax', 'logx', 'logy', 'grid', 'npts', 'xlabel', 'ylabel',
  'logsweep', 'xaxmin', 'xaxmax'].forEach(id => {
@@ -944,7 +952,7 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => upda
 
 // boot
 const saved = loadState();
-if (saved && saved.fns && saved.params) { state = saved; els.preset.value = state.presetName || 'Blank'; writeAxesToUI(); renderDefs(); renderFns(); update(); }
+if (saved && saved.fns && saved.params) { state = saved; els.preset.value = state.presetName || 'Simple example'; writeAxesToUI(); renderDefs(); renderFns(); update(); }
 else applyPreset(PRESETS[1]);
 </script>
 </body>
