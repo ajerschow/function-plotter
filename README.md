@@ -16,7 +16,7 @@ HTML file that runs offline in any modern browser.
 - **Log x / log y axes**, optional grid, adjustable sample count (50–5000 points).
 - **Custom axis labels** and manual or automatic axis ranges.
 - **Copy data as CSV** for the sampled points.
-- **Light/dark theme**, following the system setting unless overridden.
+- **Light/dark theme**, dark by default; toggle with the Theme button or the one next to Clear, and the choice is remembered.
 - **State is remembered** in `localStorage` between sessions.
 - **Named definitions** (opt-in, see below), usable in any curve and selectable as the x-axis.
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -221,6 +221,7 @@ details.ref td { padding: 2px 10px 2px 0; vertical-align: top; }
       <button id="copyCsv">Copy data as CSV</button>
       <button id="resetView">Reset to example</button>
       <button id="clearAll">Clear</button>
+      <button id="themeBtn2" title="Toggle light/dark">Light theme</button>
       <span class="msg" id="msg"></span>
     </div>
   </main>
@@ -964,14 +965,18 @@ $('copyCsv').onclick = async () => {
   catch (_) { els.msg.textContent = 'Clipboard blocked by the browser; try again after clicking the page.'; }
   setTimeout(() => { els.msg.textContent = ''; }, 4000);
 };
-$('themeBtn').onclick = () => {
-  const cur = document.documentElement.dataset.theme;
-  const dark = cur ? cur === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-  document.documentElement.dataset.theme = dark ? 'light' : 'dark';
-  try { localStorage.setItem('pchem-plotter-theme', document.documentElement.dataset.theme); } catch (_) {}
+// Dark is the default; the choice is remembered once made.
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  $('themeBtn2').textContent = t === 'dark' ? 'Light theme' : 'Dark theme';
+  try { localStorage.setItem('pchem-plotter-theme', t); } catch (_) {}
   update(false);
-};
-try { const th = localStorage.getItem('pchem-plotter-theme'); if (th) document.documentElement.dataset.theme = th; } catch (_) {}
+}
+const toggleTheme = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+$('themeBtn').onclick = toggleTheme;
+$('themeBtn2').onclick = toggleTheme;
+try { const th = localStorage.getItem('pchem-plotter-theme'); if (th === 'light' || th === 'dark') document.documentElement.dataset.theme = th; } catch (_) {}
+$('themeBtn2').textContent = document.documentElement.dataset.theme === 'dark' ? 'Light theme' : 'Dark theme';
 new ResizeObserver(() => update(false)).observe(els.canvas.parentElement);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => update(false));
 
