@@ -12,7 +12,7 @@ HTML file that runs offline in any modern browser.
   for powers, and clear error messages pointing at the offending token.
 - **Named parameters.** Any identifier that isn't the plot variable, a constant, or a
   function becomes a slider, so curves can be varied interactively.
-- **Multiple curves** on shared axes. Each has a colour (theme palette, a few extras, or any colour via the picker) and a solid, dashed or dotted line style.
+- **Multiple curves** on shared axes. Each has a colour (click its chip: the six theme colours, twelve more, or any hex value) and a solid, dashed or dotted line style, chosen with icon buttons.
 - **Log x / log y axes**, optional grid, adjustable sample count (50–5000 points).
 - **Custom axis labels** and manual or automatic axis ranges.
 - **Copy data as CSV** for the sampled points.

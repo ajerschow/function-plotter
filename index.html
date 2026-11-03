@@ -71,9 +71,23 @@ section h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--i
 .fn .err { grid-column: 2 / -1; color: var(--danger); font-size: 12.5px; margin: -4px 0 4px; }
 .fn .xrow { grid-column: 2 / -1; display: grid; grid-template-columns: auto auto 1fr; gap: 6px; align-items: center; margin: -2px 0 2px; }
 .fn .xrow span { color: var(--ink-3); font-size: 12.5px; }
-.fn .style { grid-column: 2 / -1; display: flex; gap: 6px; align-items: center; margin: -2px 0 2px; }
-.fn .style select { width: auto; font-size: 12.5px; padding: 3px 6px; }
-.fn .style input[type=color] { width: 28px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; cursor: pointer; }
+.fn .style { grid-column: 2 / -1; display: flex; gap: 10px; align-items: center; margin: -2px 0 2px; }
+.cbtn { width: 34px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--panel); }
+.cbtn i { display: block; width: 20px; height: 14px; border-radius: 3px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg button { width: 36px; height: 22px; padding: 0; border: 0; border-radius: 0; background: var(--panel); color: var(--ink-3); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent); color: var(--accent-ink); }
+.seg svg { width: 24px; height: 8px; }
+.cpop { position: fixed; z-index: 50; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.35); width: 208px; }
+.cpop .lbl { font-size: 11.5px; color: var(--ink-3); margin: 0 0 5px; }
+.cpop .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 8px; }
+.cpop .grid button { width: 24px; height: 24px; padding: 0; border-radius: 50%; border: 2px solid transparent; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(128,128,128,.45); }
+.cpop .grid button.on { border-color: var(--ink); }
+.cpop .hex { display: flex; gap: 6px; align-items: center; }
+.cpop .hex input { font-family: var(--mono); font-size: 12.5px; padding: 3px 6px; min-width: 0; flex: 1; }
+.cpop .hex input.bad { border-color: var(--danger); }
+.cpop .reset { margin-top: 8px; font-size: 12.5px; padding: 3px 8px; width: 100%; }
 .fn .xrow select { width: auto; font-family: var(--mono); font-size: 12.5px; padding: 3px 6px; }
 .def { display: grid; grid-template-columns: 5.5em auto 1fr auto; gap: 6px; align-items: center; margin-bottom: 6px; }
 .def input { font-family: var(--mono); font-size: 12.5px; padding: 4px 6px; }
@@ -474,8 +488,12 @@ const COLORS = ['--c1', '--c2', '--c3', '--c4', '--c5', '--c6'];
 // with "--" is a theme variable (so it adapts to light/dark); anything else is a fixed hex.
 const COLOR_CHOICES = [
   ['--c1', 'Teal'], ['--c2', 'Orange'], ['--c3', 'Pink'], ['--c4', 'Indigo'], ['--c5', 'Green'], ['--c6', 'Red'],
-  ['#1f77b4', 'Blue'], ['#8e44ad', 'Purple'], ['#8d5a3b', 'Brown'], ['#e6c200', 'Yellow'],
-  ['--ink-3', 'Gray'], ['--ink', 'Black / white']];
+  ['#1f77b4', 'Blue'], ['#8e44ad', 'Purple'], ['#8d5a3b', 'Brown'], ['#e6c200', 'Yellow'], ['#17becf', 'Cyan'], ['#8bc34a', 'Lime'],
+  ['#e91e63', 'Magenta'], ['#1a237e', 'Navy'], ['#808000', 'Olive'], ['#ff7f50', 'Coral'], ['--ink-3', 'Gray'], ['--ink', 'Black / white']];
+const DASH_ICONS = {
+  '': '<line x1="1" y1="4" x2="23" y2="4" stroke="currentColor" stroke-width="2"/>',
+  dashed: '<line x1="1" y1="4" x2="23" y2="4" stroke="currentColor" stroke-width="2" stroke-dasharray="6 3.5"/>',
+  dotted: '<line x1="1.5" y1="4" x2="23" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="0.1 4.2"/>' };
 const DASHES = { '': [], dashed: [9, 5], dotted: [2, 4] };
 // CSS colour string for curve i (default: the i-th palette colour).
 const curveCss = (f, i) => !f.color ? `var(${COLORS[i % COLORS.length]})` : f.color.startsWith('--') ? `var(${f.color})` : f.color;
@@ -522,6 +540,57 @@ function loadState() {
   } catch (_) { return null; }
 }
 
+/* ---------------- Colour popover ---------------- */
+// One popover for the whole page: the six theme colours first (the defaults), then more fixed
+// colours, then a hex field for anything else.
+let colorPop = null;
+function closeColorPop() { if (colorPop) { colorPop.remove(); colorPop = null; } }
+document.addEventListener('click', (ev) => { if (colorPop && !colorPop.contains(ev.target)) closeColorPop(); });
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeColorPop(); });
+function openColorPop(anchor, f, i, onChange) {
+  closeColorPop();
+  const pop = document.createElement('div'); pop.className = 'cpop';
+  const cssOf = (v) => v.startsWith('--') ? `var(${v})` : v;
+  const current = () => f.color || COLORS[i % COLORS.length];
+  const mk = (title, list) => {
+    const l = document.createElement('div'); l.className = 'lbl'; l.textContent = title;
+    const g = document.createElement('div'); g.className = 'grid';
+    list.forEach(([v, name]) => {
+      const b = document.createElement('button'); b.title = name; b.style.background = cssOf(v); b.dataset.v = v;
+      b.onclick = () => { f.color = v; onChange(); refresh(); };
+      g.appendChild(b);
+    });
+    pop.append(l, g);
+  };
+  mk('Default colours', COLOR_CHOICES.slice(0, 6));
+  mk('More colours', COLOR_CHOICES.slice(6));
+  const l = document.createElement('div'); l.className = 'lbl'; l.textContent = 'Any colour (hex)'; pop.appendChild(l);
+  const hexRow = document.createElement('div'); hexRow.className = 'hex';
+  const hex = document.createElement('input'); hex.type = 'text'; hex.placeholder = '#rrggbb'; hex.spellcheck = false;
+  const ok = document.createElement('button'); ok.textContent = 'Set';
+  const applyHex = () => {
+    let t = hex.value.trim(); if (t && t[0] !== '#') t = '#' + t;
+    if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(t)) { hex.classList.remove('bad'); f.color = t.toLowerCase(); onChange(); refresh(); }
+    else hex.classList.add('bad');
+  };
+  hex.onkeydown = (ev) => { if (ev.key === 'Enter') applyHex(); };
+  ok.onclick = applyHex;
+  hexRow.append(hex, ok); pop.appendChild(hexRow);
+  const reset = document.createElement('button'); reset.className = 'reset'; reset.textContent = 'Reset to default';
+  reset.onclick = () => { f.color = ''; onChange(); refresh(); };
+  pop.appendChild(reset);
+  function refresh() {
+    pop.querySelectorAll('.grid button').forEach(b => b.classList.toggle('on', b.dataset.v === current()));
+    hex.value = /^#/.test(f.color || '') ? f.color : '';
+  }
+  refresh();
+  document.body.appendChild(pop);
+  const r = anchor.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8)) + 'px';
+  pop.style.top = (r.bottom + pop.offsetHeight + 12 > innerHeight ? Math.max(8, r.top - pop.offsetHeight - 4) : r.bottom + 4) + 'px';
+  colorPop = pop;
+}
+
 /* ---------------- UI: functions ---------------- */
 function renderFns() {
   els.fns.innerHTML = '';
@@ -548,33 +617,20 @@ function renderFns() {
       xr.append(tag, sel, document.createElement('span')); row.appendChild(xr);
     }
     const st = document.createElement('div'); st.className = 'style';
-    const csel = document.createElement('select'); csel.setAttribute('aria-label', `Curve ${i + 1} colour`);
-    [['', 'Default colour'], ...COLOR_CHOICES, ['custom', 'Custom…']].forEach(([v, text]) => {
-      const o = document.createElement('option'); o.value = v; o.textContent = text; csel.appendChild(o); });
-    const cpick = document.createElement('input'); cpick.type = 'color'; cpick.title = 'Pick any colour';
-    // Current colour as #rrggbb for the picker (the row isn't in the DOM yet, so read the variable from the root).
-    const hexNow = () => {
-      const c = !f.color ? COLORS[i % COLORS.length] : f.color;
-      const t = document.createElement('canvas').getContext('2d');
-      t.fillStyle = c.startsWith('--') ? getComputedStyle(document.documentElement).getPropertyValue(c).trim() : c;
-      return t.fillStyle;
-    };
-    const known = (f.color || '') === '' || COLOR_CHOICES.some(([v]) => v === f.color);
-    csel.value = known ? (f.color || '') : 'custom';
-    cpick.value = /^#[0-9a-f]{6}$/i.test(f.color || '') ? f.color : hexNow();
-    const apply = () => { sw.style.background = curveCss(f, i); update(); };
-    csel.onchange = () => {
-      if (csel.value === 'custom') { f.color = cpick.value; cpick.click(); }
-      else f.color = csel.value;
-      apply();
-    };
-    cpick.oninput = () => { f.color = cpick.value; csel.value = COLOR_CHOICES.some(([v]) => v === f.color) ? f.color : 'custom'; apply(); };
-    const dsel = document.createElement('select'); dsel.setAttribute('aria-label', `Curve ${i + 1} line style`);
-    [['', 'Solid'], ['dashed', 'Dashed'], ['dotted', 'Dotted']].forEach(([v, text]) => {
-      const o = document.createElement('option'); o.value = v; o.textContent = text; dsel.appendChild(o); });
-    dsel.value = f.dash || '';
-    dsel.onchange = () => { f.dash = dsel.value; update(); };
-    st.append(csel, cpick, dsel); row.appendChild(st);
+    const cbtn = document.createElement('button'); cbtn.className = 'cbtn'; cbtn.title = 'Colour';
+    cbtn.setAttribute('aria-label', `Curve ${i + 1} colour`);
+    const chip = document.createElement('i'); chip.style.background = curveCss(f, i); cbtn.appendChild(chip);
+    cbtn.onclick = (ev) => { ev.stopPropagation(); openColorPop(cbtn, f, i, () => {
+      chip.style.background = curveCss(f, i); sw.style.background = curveCss(f, i); update(); }); };
+    const seg = document.createElement('div'); seg.className = 'seg';
+    [['', 'Solid'], ['dashed', 'Dashed'], ['dotted', 'Dotted']].forEach(([v, name]) => {
+      const b = document.createElement('button'); b.title = name; b.setAttribute('aria-label', `Curve ${i + 1} ${name.toLowerCase()} line`);
+      b.innerHTML = `<svg viewBox="0 0 24 8">${DASH_ICONS[v]}</svg>`;
+      b.classList.toggle('on', (f.dash || '') === v);
+      b.onclick = () => { f.dash = v; seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); update(); };
+      seg.appendChild(b);
+    });
+    st.append(cbtn, seg); row.appendChild(st);
     const err = document.createElement('div'); err.className = 'err'; row.appendChild(err);
     els.fns.appendChild(row);
   });
