@@ -407,7 +407,7 @@ const PRESETS = [
   // Water, assuming a constant ΔvapH = 40.65 kJ/mol and T_b = 373.15 K at 1 atm.
   // Integrating dlnP/dT = ΔH/(RT²) gives ln(P/1 atm) = -(ΔH/R)(1/T - 1/T_b); solved for T
   // it is explicit in P, so no inversion is needed. Everest is about 0.33 atm.
-  { name: 'boiling point vs. pressure (HW5-5)', v: 'P', xmin: '0.33', xmax: '1',
+  { name: 'boiling point vs. pressure (HW5-4)', v: 'P', xmin: '0.33', xmax: '1',
     xlabel: 'P / atm', ylabel: 'T_b / K',
     defs: [
       { name: 'dH', src: '40650' },
@@ -424,6 +424,31 @@ const PRESETS = [
       { y: '1e5*(2*0.1355/(R*T) - 3.201e-5)/(5/2*R)', label: 'Ar (C_P = 5R/2)' },
       { y: '1e5*(2*0.02476/(R*T) - 2.661e-5)/(7/2*R)', label: 'H₂ (C_P = 7R/2)' },
       { y: '1e5*(2*0.1370/(R*T) - 3.87e-5)/(7/2*R)', label: 'N₂ (C_P = 7R/2)' }],
+    params: {} },
+  // Binary mixture with a(1) = x1 exp(alpha x2²), hence a(2) = x2 exp(alpha x1²) by Gibbs–Duhem.
+  // Real P_j = a_j P_j*, ideal (Raoult) P_j = x_j P_j*; the totals are the sums.
+  { name: 'real vs. ideal vapor pressures (HW6-2)', v: 'x1', xmin: '0', xmax: '1', ymin: '0',
+    xlabel: 'x₁', ylabel: 'P / bar',
+    defs: [{ name: 'x2', src: '1 - x1' }],
+    fns: [
+      { y: 'P1s*x1*exp(alpha*x2^2)', label: 'P₁ (real)' },
+      { y: 'P2s*x2*exp(alpha*x1^2)', label: 'P₂ (real)' },
+      { y: 'P1s*x1*exp(alpha*x2^2) + P2s*x2*exp(alpha*x1^2)', label: 'P total (real)' },
+      { y: 'P1s*x1', label: 'P₁ (ideal)' },
+      { y: 'P2s*x2', label: 'P₂ (ideal)' },
+      { y: 'P1s*x1 + P2s*x2', label: 'P total (ideal)' }],
+    params: { alpha: [1.5, 0, 4, 0.1], P1s: [3, 0.5, 10, 0.5], P2s: [1, 0.5, 10, 0.5] } },
+  // ΔG_mix/w = (RT/w)(x1 ln x1 + x2 ln x2) + x1 x2, with alpha = w/RT. The critical case is
+  // RT/w = 1/2; below it the curve has two minima (partial miscibility). The end points are
+  // left out because 0*ln(0) is NaN numerically, although its limit is 0.
+  { name: 'Gibbs energy of mixing (HW6-3)', v: 'x1', xmin: '0.001', xmax: '0.999',
+    xlabel: 'x₁', ylabel: 'ΔG̅_mix / w',
+    defs: [{ name: 'x2', src: '1 - x1' }],
+    fns: [
+      { y: '0.6*(x1*ln(x1) + x2*ln(x2)) + x1*x2', label: 'RT/w = 0.6' },
+      { y: '0.5*(x1*ln(x1) + x2*ln(x2)) + x1*x2', label: 'RT/w = 0.5' },
+      { y: '0.2*(x1*ln(x1) + x2*ln(x2)) + x1*x2', label: 'RT/w = 0.2' },
+      { y: '0.1*(x1*ln(x1) + x2*ln(x2)) + x1*x2', label: 'RT/w = 0.1' }],
     params: {} },
   { name: 'Arrhenius rate constant (log y)', v: 'T', xmin: '250', xmax: '600', logy: true, xlabel: 'T / K', ylabel: 'k / s⁻¹',
     fns: ['A*exp(-Ea/(R*T))', 'A*exp(-Ea2/(R*T))'],

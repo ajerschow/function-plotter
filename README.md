@@ -29,7 +29,8 @@ distribution functions · Boltzmann populations of a two-level system · reduced
 Waals isotherms Pᵣ(Vᵣ) · reduced van der Waals compressibility factor Z(Pᵣ) · molar
 enthalpy of ethane integrated from its heat capacity · isothermal and reversible
 adiabatic expansion of a monatomic and a diatomic ideal gas · boiling point of water vs.
-pressure (Clausius-Clapeyron) · Joule-Thomson coefficient of Ar, H₂ and N₂ from van der Waals constants.
+pressure (Clausius-Clapeyron) · Joule-Thomson coefficient of Ar, H₂ and N₂ from van der Waals constants · real vs. ideal
+vapor pressures of a binary mixture · Gibbs energy of mixing for a regular solution.
 
 ## Expression syntax
 
